@@ -1,5 +1,7 @@
 #include <ncurses.h>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -8,6 +10,7 @@ using namespace std;
 
 void init();
 void update();
+void keyControl();
 void exit();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
@@ -18,11 +21,19 @@ WINDOW *win3;
 // 벽, 캐릭터 위치 등 글로벌 정보를 저장할 이차원 배열
 int map[HEIGHT][WIDTH] = {};
 
+// 입력키 저장 (아래쪽-258, 위쪽-259, 왼쪽-260, 오른쪽-261)
+static int key = 75;
+
 int main(int argc, char *argv[])
 {
+  thread t_kc(keyControl);
+
   init();
   update();
   exit();
+
+  if(t_kc.joinable())
+    t_kc.join();
 }
 
 void init()
@@ -32,6 +43,7 @@ void init()
   resize_term(HEIGHT + 2, WIDTH * 2 + 30);    // 화면 크기 설정 (점수 표시를 위한 공간 포함)
   curs_set(0);                            // 커서(깜빡임) 비활성화
   box(stdscr, 0, 0);
+  keypad(stdscr, TRUE);
   noecho();
 
   // Default 또는 새로운 윈도우에서 사용할 Color Set 설정
@@ -130,13 +142,35 @@ void init()
 
 void update()
 {
-  // Window Refresh(변경사항 반영)
-  refresh();
-  wrefresh(win1);
-  wrefresh(win2);
-  wrefresh(win3);
+  while(true)
+  {
+    // Window Refresh(변경사항 반영)
+    refresh();
+    wrefresh(win1);
+    wrefresh(win2);
+    wrefresh(win3);
 
-  getch();
+    this_thread::sleep_for(chrono::milliseconds(500));
+  }
+}
+
+void keyControl()
+{
+  while(true)
+  {
+    key = getch();
+    if(key == 259)
+      printw("UP");
+    if(key == 258)
+      printw("DOWN");
+    if(key == 260)
+      printw("LEFT");
+    if(key == 261)
+      printw("RIGHT");
+
+
+    this_thread::sleep_for(chrono::milliseconds(100));
+  }
 }
 
 void exit()

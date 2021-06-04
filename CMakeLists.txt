@@ -11,6 +11,7 @@ project(
 
 message(STATUS ">> PROJECT_NAME: ${PROJECT_NAME}")
 find_package(Curses REQUIRED)
+find_package(Threads)
 
 # print out the properties of dev environment of ncurses
 message(STATUS ">> CURSES_INCLUDE_DIRS: ${CURSES_INCLUDE_DIRS}")
@@ -25,6 +26,8 @@ add_executable(${PROJECT_NAME}
 
 # tell it to link the executable target against ncurses
 target_link_libraries(${PROJECT_NAME} ${CURSES_LIBRARIES})
+
+target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT})
 
 target_include_directories(${PROJECT_NAME}
   PUBLIC
