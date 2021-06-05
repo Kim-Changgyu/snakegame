@@ -2,15 +2,25 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <vector>
 
 using namespace std;
 
-#define WIDTH 21  // 가로 크기
-#define HEIGHT 21 // 세로 크기
+#define WIDTH 21     // 가로 크기
+#define HEIGHT 21    // 세로 크기
+
+#define TICK_RATE 500 // 화면 갱신 시간 (ms)
+
+#define LEFT 260
+#define RIGHT 261
+#define UP 259
+#define DOWN 258
+#define ESC 27
 
 void init();
 void update();
 void keyControl();
+void map_update();
 void exit();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
@@ -20,20 +30,23 @@ WINDOW *win3;
 
 // 벽, 캐릭터 위치 등 글로벌 정보를 저장할 이차원 배열
 int map[HEIGHT][WIDTH] = {};
+int y = HEIGHT/2, x = WIDTH/2;
+vector<pair<int, int>> body;
 
 // 입력키 저장 (아래쪽-258, 위쪽-259, 왼쪽-260, 오른쪽-261)
-static int key = 75;
+static int key = LEFT;
 
 int main(int argc, char *argv[])
 {
-  thread t_kc(keyControl);
+  thread key_thread(keyControl);  // 입력 제어 쓰레드 생성
 
-  init();
-  update();
-  exit();
+  init();     // Window, Map, Head, Body 등 각종 초기 설정을 위한 함수 호출
+  update();   // 게임 진행 중 수정사항 반영을 위한 함수 호출
+  exit();     // 프로그램 종료 전 메모리 반환 등을 위한 함수 호출
 
-  if(t_kc.joinable())
-    t_kc.join();
+  // 입력 제어 쓰레드 종료를 먼저 기다린 뒤 프로그램 종료
+  if(key_thread.joinable())
+    key_thread.join();
 }
 
 void init()
@@ -53,8 +66,9 @@ void init()
   init_pair(1, COLOR_WHITE, COLOR_WHITE);         // 1번 쌍에 게임화면 배경색 설정
   init_pair(2, COLOR_BLACK, COLOR_BLACK);         // 2번 쌍에 각 꼭짓점(Immune Wall) 색상 설정
   init_pair(3, COLOR_CYAN, COLOR_CYAN);           // 3번 쌍에 모서리(Wall) 색상 설정
-  init_pair(4, COLOR_BLACK, COLOR_CYAN);          // 4번 쌍에 점수 윈도우에서 폰트로 사용할 색상 설정
   init_pair(5, COLOR_GREEN, COLOR_GREEN);
+  init_pair(6, COLOR_RED, COLOR_RED);
+  init_pair(4, COLOR_BLACK, COLOR_CYAN);          // 4번 쌍에 점수 윈도우에서 폰트로 사용할 색상 설정
 
   // 게임화면 및 점수 표시 관련 윈도우 생성 및 초기화
   win1 = newwin(HEIGHT, WIDTH * 2, 1, 2); // 설정한 가로, 세로 크기에 따라 게임화면 윈도우를 생성
@@ -73,43 +87,10 @@ void init()
     map[0][i] = map[HEIGHT-1][i] = 1;
   for(int i = 1; i < HEIGHT-1; i++)
     map[i][0] = map[i][WIDTH-1] = 1;
-  map[HEIGHT/2][WIDTH/2] = 3;
+  map[y][x] = 3;
 
-  // 게임화면의 초기 색상 적용
-  for(int i = 0; i < HEIGHT; i++)
-  {
-    for(int j = 0; j < WIDTH; j++)
-    {
-      if(map[i][j] == 2)                        // 게임화면의 Immune Wall 색상 초기 적용
-      {
-        wattron(win1, COLOR_PAIR(2));
-        mvwprintw(win1, i, j*2, "2");
-        mvwprintw(win1, i, j*2+1, "2");
-        wattroff(win1, COLOR_PAIR(2));
-      }
-      else if(map[i][j] == 1)                   // 게임화면의 Wall 색상 초기 적용
-      {
-        wattron(win1, COLOR_PAIR(3));
-        mvwprintw(win1, i, j*2, "1");
-        mvwprintw(win1, i, j*2+1, "1");
-        wattroff(win1, COLOR_PAIR(3));
-      }
-      else if(map[i][j] == 0)                   // 게임화면의 Field 색상 초기 적용
-      {
-        wattron(win1, COLOR_PAIR(1));
-        mvwprintw(win1, i, j*2, "0");
-        mvwprintw(win1, i, j*2+1, "0");
-        wattroff(win1, COLOR_PAIR(1));
-      }
-      else
-      {
-        wattron(win1, COLOR_PAIR(5));
-        mvwprintw(win1, i, j*2, "3");
-        mvwprintw(win1, i, j*2+1, "3");
-        wattroff(win1, COLOR_PAIR(5));
-      }
-    }
-  }
+  body.push_back(pair<int, int>(y, x+1));
+  body.push_back(pair<int, int>(y, x+2));
 
   // 점수 윈도우 초기 색상 적용
   wattron(win2, COLOR_PAIR(3));
@@ -144,13 +125,44 @@ void update()
 {
   while(true)
   {
+    // 기존에 그려져 있던 Head, Body를 Map에서 삭제
+    map[y][x] = 0;
+    for(int i = 0; i < body.size(); i++)
+      map[body[i].first][body[i].second] = 0;
+
+    // Head를 body[0]으로 가져오고, 나머지는 앞에서 이동한 위치로 따라서 한 칸씩 이동
+    for(int i = 1; i < body.size(); i++)
+      body[i] = body[i-1];
+    body[0].first = y;
+    body[0].second = x;
+
+    // 입력에 따른 다음 이동 처리
+    if(key == LEFT)
+      x--;
+    if(key == RIGHT)
+      x++;
+    if(key == UP)
+      y--;
+    if(key == DOWN)
+      y++;
+    if(key == ESC || y < 1 || y > HEIGHT-2 || x < 1 || x > WIDTH-2) // 지도를 벗어나거나 ESC를 입력하면 종료
+      break;
+    map[y][x] = 3;  // 이동할 위치의 계산이 끝나면 해당 위치에 Head 표시
+
+    // body 부분을 Map에 저장
+    for(int i = 0; i < body.size(); i++)
+      map[body[i].first][body[i].second] = 4;
+
+    // 지도 업데이트 함수 호출
+    map_update();
+
     // Window Refresh(변경사항 반영)
     refresh();
     wrefresh(win1);
     wrefresh(win2);
     wrefresh(win3);
 
-    this_thread::sleep_for(chrono::milliseconds(500));
+    this_thread::sleep_for(chrono::milliseconds(TICK_RATE));  // Tick Rate 마다 화면 갱신
   }
 }
 
@@ -158,18 +170,60 @@ void keyControl()
 {
   while(true)
   {
-    key = getch();
-    if(key == 259)
-      printw("UP");
-    if(key == 258)
-      printw("DOWN");
-    if(key == 260)
-      printw("LEFT");
-    if(key == 261)
-      printw("RIGHT");
+    int input = getch();
 
+    // 방향키 입력인 경우에만 반영
+    if(input == UP || input == DOWN || input == LEFT || input == RIGHT)
+      key = input;
+    else if(input == ESC)
+      break;
 
-    this_thread::sleep_for(chrono::milliseconds(100));
+    this_thread::sleep_for(chrono::milliseconds(TICK_RATE));
+  }
+}
+
+void map_update()
+{
+  for(int i = 0; i < HEIGHT; i++)
+  {
+    for(int j = 0; j < WIDTH; j++)
+    {
+      if(map[i][j] == 2)                        // 게임화면의 Immune Wall 색상 적용
+      {
+        wattron(win1, COLOR_PAIR(2));
+        mvwprintw(win1, i, j*2, "2");
+        mvwprintw(win1, i, j*2+1, "2");
+        wattroff(win1, COLOR_PAIR(2));
+      }
+      else if(map[i][j] == 1)                   // 게임화면의 Wall 색상 적용
+      {
+        wattron(win1, COLOR_PAIR(3));
+        mvwprintw(win1, i, j*2, "1");
+        mvwprintw(win1, i, j*2+1, "1");
+        wattroff(win1, COLOR_PAIR(3));
+      }
+      else if(map[i][j] == 0)                   // 게임화면의 Field 색상 적용
+      {
+        wattron(win1, COLOR_PAIR(1));
+        mvwprintw(win1, i, j*2, "0");
+        mvwprintw(win1, i, j*2+1, "0");
+        wattroff(win1, COLOR_PAIR(1));
+      }
+      else if(map[i][j] == 3)                   // 게임화면의 Head 색상 적용
+      {
+        wattron(win1, COLOR_PAIR(5));
+        mvwprintw(win1, i, j*2, "3");
+        mvwprintw(win1, i, j*2+1, "3");
+        wattroff(win1, COLOR_PAIR(5));
+      }
+      else if(map[i][j] == 4)                   // 게임화면의 Body 색상 적용
+      {
+        wattron(win1, COLOR_PAIR(6));
+        mvwprintw(win1, i, j*2, "4");
+        mvwprintw(win1, i, j*2+1, "4");
+        wattroff(win1, COLOR_PAIR(6));
+      }
+    }
   }
 }
 
