@@ -6,33 +6,38 @@
 
 using namespace std;
 
-#define WIDTH 21     // 가로 크기
-#define HEIGHT 21    // 세로 크기
+#define WIDTH 21      // 가로 크기
+#define HEIGHT 21     // 세로 크기
 
 #define TICK_RATE 500 // 화면 갱신 시간 (ms)
 
-#define ESC 27
+#define ESC 27        // ESC
 
-void init();
-void init_draw();
-void update();
-void keyControl();
-void map_update();
-void exit();
+void init();          // 초기 설정을 위한 함수
+void init_draw();     // 초기 설정 및 업데이트 시 호출할 함수
+void update();        // 갱신 시간(Tick Rate)마다 호출할 함수
+void keyControl();    // 비동기 입력 처리를 위한 함수
+void map_update();    // update 함수에서 호출할 win1(게임화면) 업데이트 함수
+void exit();          // NCurses 종료 전 메모리 반환 등을 위한 함수
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
-WINDOW *win1;
-WINDOW *win2;
-WINDOW *win3;
+WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
+WINDOW *win2;         // 점수화면
+WINDOW *win3;         // 미션화면
 
 // 벽, 캐릭터 위치 등 글로벌 정보를 저장할 이차원 배열
 int map[HEIGHT][WIDTH] = {};
+
+// 초기 Head 위치 설정
 int y = HEIGHT/2, x = WIDTH/2;
+
+// Head를 따라갈 body (벡터의 원소는 (y, x)를 저장하도록 pair 자료형 사용)
 vector<pair<int, int>> body;
 
-// 입력키 저장 (아래쪽-258, 위쪽-259, 왼쪽-260, 오른쪽-261)
+// 입력키 저장을 위한 변수 (NCurses에 내장된 키워드 사용)
 static int key = KEY_LEFT;
 
+// 게임 실행 제어 관련 변수
 bool running = true;
 
 int main(int argc, char *argv[])
