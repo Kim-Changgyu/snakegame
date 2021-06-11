@@ -22,7 +22,8 @@ include_directories(${CURSES_INCLUDE_DIRS})
 
 #specify the name of the executable to be built
 add_executable(${PROJECT_NAME}
-  src/main.cpp)
+  src/main.cpp
+  src/timer.h)
 
 # tell it to link the executable target against ncurses
 target_link_libraries(${PROJECT_NAME} ${CURSES_LIBRARIES})
