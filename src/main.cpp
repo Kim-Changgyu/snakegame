@@ -331,6 +331,16 @@ void update()
       }
     }
 
+    // Head가 body랑 충돌했을 때, 게임 종료
+    for(int i = 0; i < body.size(); i++)
+    {
+      if(y == body[i].first && x == body[i].second)
+      {
+        running = false;
+        break;
+      }
+    }
+
     // body 부분을 Map에 저장
     for(int i = 0; i < body.size(); i++)
       map[body[i].first][body[i].second] = 4;
@@ -370,6 +380,8 @@ void keyControl()
 
       key = input;
     }
+    else if(input == ESC)
+      running = false;
   }
 }
 
