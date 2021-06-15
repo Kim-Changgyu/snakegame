@@ -5,6 +5,8 @@
 #include <vector>
 #include <time.h>
 #include <math.h>
+#include <fstream>
+#include <string>
 
 #include "timer.h"
 using namespace std;
@@ -16,12 +18,19 @@ using namespace std;
 
 #define ESC 27        // ESC
 
+void init_reset();                //미션성공 시 게임화면 초기화를 위한 함수
 void init();                      // 초기 설정을 위한 함수
 void init_draw(int playtime);     // 초기 설정 및 업데이트 시 호출할 함수
 void update();                    // 갱신 시간(Tick Rate)마다 호출할 함수
 void keyControl();                // 비동기 입력 처리를 위한 함수
 void map_update(bool itemIs);     // update 함수에서 호출할 win1(게임화면) 업데이트 함수
 void exit();                      // NCurses 종료 전 메모리 반환 등을 위한 함수
+void startview();                 //게임시작 시 화면을 위한 함수
+void gameoverview();              //게임 오버시 화면을 위한 함수
+void nextlevelview();             //미션 완료시 화면을 위한 함수
+void GameClearview();             //미션을 모두 클리어 했을때 화면을 위한 함수
+void RunGame();                   //게임 실행을 위한 함수
+void MapLoad(int level);
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
 WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
@@ -32,6 +41,8 @@ WINDOW *win3;         // 미션화면
 int map[HEIGHT][WIDTH] = {};
 
 int itemcount = 0;
+//현재 레벨에 대한 함수
+int level = 0;
 
 // 초기 Head 위치 설정
 int y = HEIGHT/2, x = WIDTH/2;
@@ -39,12 +50,16 @@ int y = HEIGHT/2, x = WIDTH/2;
 // Head를 따라갈 body (벡터의 원소는 (y, x)를 저장하도록 pair 자료형 사용)
 vector<pair<int, int>> body;
 
+//미션에 대한 2차원 벡터 missionvec[i][j]라 할 때 i는 레벨,  j는 순서대로 각 레벨의 목표bodylength, 목표growth_cnt, 목표poison_cnt 이다.
+vector<vector<int> > missionvec = { {3, 1, 0}, {3, 1, 1}, {3, 2, 1} };
+
 // 입력키 저장을 위한 변수 (NCurses에 내장된 키워드 사용)
 static int key = KEY_LEFT;
 
 // 게임 실행 제어 관련 변수
 bool running = true;
-
+// 미션을 클리어했는지 에 대한 변수
+bool IsMissionClear = false;
 
 // 포지션
 struct POSITION {
@@ -110,12 +125,110 @@ public:
   }
 };
 
+//실행함수
+void RunGame()
+{
+  //count는 레벨의 갯수만큼 반복 레벨을 모두 클리어 하거나, 게임오버가 되면 게임이 종료된다.
+  int count = 0;
+  while(count <= 2)
+  {
+    update();
+    if(IsMissionClear)
+    {
+      if(level == 3)
+      {
+        GameClearview();
+        break;
+      }
+      nextlevelview();
+      IsMissionClear = false;
+    }
+    else
+    {
+      gameoverview();
+      break;
+    }
+    running = true;
+    count++;
+    refresh();
+    init_reset();
+  }
+}
+
+void GameClearview()
+{
+  clear();
+  nodelay(stdscr, FALSE);
+  refresh();
+  refresh();
+  initscr();
+  start_color();
+  init_pair(1, COLOR_RED,COLOR_WHITE);
+  attron(COLOR_PAIR(1));
+  printw("Game Clear!\n");
+  printw("Press any key");
+  attroff(COLOR_PAIR(1));
+  refresh();
+  getch();
+  endwin();
+}
+
+void nextlevelview()
+{
+  clear();
+  nodelay(stdscr, FALSE);
+  refresh();
+  initscr();
+  start_color();
+  init_pair(1, COLOR_RED,COLOR_WHITE);
+  attron(COLOR_PAIR(1));
+  printw("level : %d clear\n",level);
+  printw("Press any key");
+  attroff(COLOR_PAIR(1));
+  refresh();
+  getch();
+  endwin();
+}
+
+void startview()
+{
+  initscr();
+  start_color();
+  init_pair(1, COLOR_RED,COLOR_WHITE);
+  attron(COLOR_PAIR(1));
+  printw("Snake Game\n");
+  printw("Press any key");
+  attroff(COLOR_PAIR(1));
+  refresh();
+  getch();
+  endwin();
+}
+void gameoverview()
+{
+  clear();
+  nodelay(stdscr, FALSE);
+  refresh();
+  initscr();
+  start_color();
+  init_pair(1, COLOR_RED,COLOR_WHITE);
+  attron(COLOR_PAIR(1));
+  printw("Game Over\n");
+  printw("Press any key");
+  attroff(COLOR_PAIR(1));
+  refresh();
+  getch();
+  clear();
+}
+
 int main(int argc, char *argv[])
 {
-  init();     // Window, Map, Head, Body 등 각종 초기 설정을 위한 함수 호출
-  update();   // 게임 진행 중 수정사항 반영을 위한 함수 호출
-  exit();     // 프로그램 종료 전 메모리 반환 등을 위한 함수 호출
+   startview();//시작화면
+   init();     // Window, Map, Head, Body 등 각종 초기 설정을 위한 함수 호출
+   RunGame(); //게임실행
+   exit();     // 프로그램 종료 전 메모리 반환 등을 위한 함수 호출
+   return 0;
 }
+
 
 void init()
 {
@@ -148,17 +261,41 @@ void init()
   init_draw(k);
 
   // Immune Wall, Wall, Field와 Character의 Head, Body 초기 설정
-  map[0][0] = map[0][WIDTH-1] = 2;
-  map[HEIGHT-1][0] = map[HEIGHT-1][WIDTH-1] = 2;
-  for(int i = 1; i < WIDTH-1; i++)
-    map[0][i] = map[HEIGHT-1][i] = 1;
-  for(int i = 1; i < HEIGHT-1; i++)
-    map[i][0] = map[i][WIDTH-1] = 1;
-  map[y][x] = 3;
+  // map[0][0] = map[0][WIDTH-1] = 2;
+  // map[HEIGHT-1][0] = map[HEIGHT-1][WIDTH-1] = 2;
+  // for(int i = 1; i < WIDTH-1; i++)
+  //   map[0][i] = map[HEIGHT-1][i] = 1;
+  // for(int i = 1; i < HEIGHT-1; i++)
+  //   map[i][0] = map[i][WIDTH-1] = 1;
+  MapLoad(level);
 
+  map[y][x] = 3;
   // Head 기준으로 오른쪽으로 Body 초기 설정
   body.push_back(pair<int, int>(y, x+1));
   body.push_back(pair<int, int>(y, x+2));
+}
+
+// data/ 디렉토리에 위치한 stage(0, 1, 2, 3).txt File을 읽어서 Map에 저장
+void MapLoad(int level)
+{
+  ifstream load("data/stage" + to_string(level) + ".txt");
+
+  int rows = 0, cols = 0;
+  char Celement;
+  while(load.get(Celement))
+  {
+    int Ielement = (int)(Celement - '0');
+    if(Ielement >= 0 && Ielement <= 8)
+    {
+      map[rows][cols] = Ielement;
+      cols++;
+    }
+    else if(Celement == '\r')
+    {
+      load.get(Celement);               // 텍스트 파일이기 때문에 \r을 읽은 직후 \n도 읽어서 무시
+      rows++;
+    }
+  }
 }
 
 vector<Item> ItemContainer(0);
@@ -208,21 +345,28 @@ void init_draw(int playtime)
   wbkgd(win3, COLOR_PAIR(1));
   wattroff(win3, COLOR_PAIR(1));
 
-  // 미션창 초기 텍스트 설정
+  // 미션창 초기 텍스트 설정 현재 목표 미션과 현재 생태를 확인할 수 있다.
   wattron(win3, COLOR_PAIR(4));
   mvwprintw(win3, 1, 1, "Mission");
-  mvwprintw(win3, 3, 1, "B: 0 ( )");
-  mvwprintw(win3, 4, 1, "+: 0 ( )");
-  mvwprintw(win3, 5, 1, "-: 0 ( )");
-  mvwprintw(win3, 6, 1, "G: 0 ( )");
+  mvwprintw(win3, 3, 1, "B: %d (%d)",missionvec[level][0],body.size()+1);
+  mvwprintw(win3, 4, 1, "+: %d (%d)",missionvec[level][1] , growth_cnt);
+  mvwprintw(win3, 5, 1, "-: %d (%d)",missionvec[level][2] , poison_cnt);
+  mvwprintw(win3, 6, 1, "G: ()");
   wattroff(win3, COLOR_PAIR(4));
+
+  // 미션을 충족했으면 미션 클리어 변수에 true; 하고 레벨을 하나 올린다.
+  if(missionvec[level][0] <= body.size()+1 && missionvec[level][1] <= growth_cnt && missionvec[level][2] <= poison_cnt)
+  {
+      IsMissionClear = true;
+      level++;
+      MapLoad(level);         // 다음 스테이지의 맵 로드
+  }
 
   refresh();
   wrefresh(win1);
   wrefresh(win2);
   wrefresh(win3);
 }
-
 void update()
 {
   // 입력 제어 쓰레드 생성
@@ -244,7 +388,11 @@ void update()
   while(running)
   {
     init_draw(playtime);
-
+    if(IsMissionClear)
+    {
+      running = false;
+      break;
+    }
     levelTimer.updateTime();
     itemTimer.updateTime();
     playtime = levelTimer.getPlayTime();
@@ -297,7 +445,7 @@ void update()
       y--;
     else if(key == KEY_DOWN)
       y++;
-    if(y < 1 || y > HEIGHT-2 || x < 1 || x > WIDTH-2) // 지도를 벗어나거나 ESC를 입력하면 종료
+    if(y < 1 || y > HEIGHT-2 || x < 1 || x > WIDTH-2 || map[y][x] == 1) // 지도를 벗어나거나 ESC를 입력하면 종료
     {
       running = false;
       break;
@@ -376,12 +524,15 @@ void keyControl()
       // 입력 진행과 반대 방향의 키를 입력하면 게임 종료
       if((input == KEY_UP && key == KEY_DOWN) || (input == KEY_DOWN && key == KEY_UP)
         || (input == KEY_LEFT && key == KEY_RIGHT) || (input == KEY_RIGHT && key == KEY_LEFT))
-        running = false;
-
+        {
+          running = false;
+        }
       key = input;
     }
     else if(input == ESC)
+    {
       running = false;
+    }
   }
 }
 
@@ -447,6 +598,63 @@ void map_update(bool itemIs)
   }
 
 }
+//게임화면 리셋을 위한 함수
+void init_reset()
+{
+  key = KEY_LEFT;
+  growth_cnt = 0;
+  poison_cnt = 0;
+  for(int i = 0; i < body.size(); i++)
+    map[body[i].first][body[i].second] = 0;
+  for(int items = 0; items < ItemContainer.size(); items++)
+  {
+    map[ItemContainer[items].pos.x][ItemContainer[items].pos.y] = 0;
+  }
+  ItemContainer.clear();
+  body.clear();
+  map[y][x] = 0;
+  // 초기 설정 관련
+  initscr();                                  // 스크린 활성화
+  resize_term(HEIGHT + 2, WIDTH * 2 + 30);    // 화면 크기 설정 (점수 표시를 위한 공간 포함)
+  box(stdscr, 0, 0);                          // Default Window 에 기본 테투리 설정
+  curs_set(0);                                // 커서(깜빡임) 비활성화
+  keypad(stdscr, TRUE);                       // 특수키(ESC, 방향키 등) 사용 가능하도록 설정
+  noecho();
+  timeout(0);
+
+  // Default 또는 새로운 윈도우에서 사용할 Color Set 설정
+  start_color();
+  init_color(COLOR_BLACK, 0, 0, 0);               // 검은색 Color를 완전히 어두운 색으로 설정
+  init_color(COLOR_CYAN, 500, 500, 500);          // 기본 Color로 Gray 색상이 제공되지 않기 때문에 CYAN Color를 회색으로 변경
+  init_color(COLOR_MAGENTA, 500, 0, 500);          // 기본 Color로 Gray 색상이 제공되지 않기 때문에 CYAN Color를 회색으로 변경
+
+  init_pair(1, COLOR_CYAN, COLOR_CYAN);           // 1번 쌍에 모서리(Wall), 점수, 미션 윈도우 색상 설정
+  init_pair(2, COLOR_BLACK, COLOR_BLACK);         // 2번 쌍에 각 꼭짓점(Immune Wall) 색상 설정
+  init_pair(3, COLOR_WHITE, COLOR_WHITE);         // 3번 쌍에 게임화면의 배경 색상(흰색) 설정
+  init_pair(4, COLOR_BLACK, COLOR_CYAN);          // 4번 쌍에 점수 윈도우에서 폰트로 사용할 색상 설정
+  init_pair(5, COLOR_GREEN, COLOR_GREEN);         // 5번 쌍에 Snake Head 색상 설정
+  init_pair(6, COLOR_RED, COLOR_RED);             // 6번 쌍에 Snake Body 색상 설정
+  init_pair(7, COLOR_YELLOW, COLOR_YELLOW);     // 7번 쌍에 Growth Potion 색상 설정
+  init_pair(8, COLOR_MAGENTA, COLOR_MAGENTA);     // 8번 쌍에 Poision Potion 색상 설정
+
+  //
+  int k = 0;
+  init_draw(k);
+  y = HEIGHT/2, x = WIDTH/2;
+  // Immune Wall, Wall, Field와 Character의 Head, Body 초기 설정bool
+  map[0][0] = map[0][WIDTH-1] = 2;
+  map[HEIGHT-1][0] = map[HEIGHT-1][WIDTH-1] = 2;
+  for(int i = 1; i < WIDTH-1; i++)
+    map[0][i] = map[HEIGHT-1][i] = 1;
+  for(int i = 1; i < HEIGHT-1; i++)
+    map[i][0] = map[i][WIDTH-1] = 1;
+  map[y][x] = 3;
+
+  // Head 기준으로 오른쪽으로 Body 초기 설정
+  body.push_back(pair<int, int>(y, x+1));
+  body.push_back(pair<int, int>(y, x+2));
+}
+
 
 // 종료 전 메모리 반환을 위한 함수
 void exit()
