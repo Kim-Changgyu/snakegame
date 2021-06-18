@@ -166,7 +166,7 @@ public:
       in_dir = KEY_LEFT;
     else if(in.y == 0)
       in_dir = KEY_DOWN;
-    else
+    else if(in.y == HEIGHT-1)
       in_dir = KEY_UP;
 
     if(out.x == 0)
@@ -175,7 +175,7 @@ public:
       out_dir = KEY_LEFT;
     else if(out.y == 0)
       out_dir = KEY_DOWN;
-    else
+    else if(out.y == HEIGHT-1)
       out_dir = KEY_UP;
   }
 };
@@ -199,7 +199,10 @@ void RunGame()
       }
       nextlevelview();
       IsMissionClear = false;
+
       IsGate = false;
+      if(GateManager.size() > 0)
+        GateManager.pop_back();
     }
     else
     {
@@ -613,6 +616,8 @@ void GateControl()
   {
     if(x == GateManager[0].in.x && y == GateManager[0].in.y)
     {
+      if((GateManager[0].out.x == 0 || GateManager[0].out.x == WIDTH-1) || (GateManager[0].out.y == 0 || GateManager[0].out.y == HEIGHT-1))
+      {
       if(GateManager[0].out_dir == KEY_RIGHT)
       {
         x = 0;
@@ -641,9 +646,130 @@ void GateControl()
 
         key = KEY_LEFT;
       }
+      }
+      else
+      {
+        x = GateManager[0].out.x;
+        y = GateManager[0].out.y;
+
+        int next_x, next_y;
+        int dir;
+        if(key == KEY_LEFT)
+        {
+          next_x = x - 1;
+          next_y = y;
+        }
+        else if(key == KEY_RIGHT)
+        {
+          next_x = x + 1;
+          next_y = y;
+        }
+        else if(key == KEY_UP)
+        {
+          next_x = x;
+          next_y = y - 1;
+        }
+        else if(key == KEY_DOWN)
+        {
+          next_x = x;
+          next_y = y + 1;
+        }
+
+        if(map[next_y][next_x] == 1)
+        {
+          if(key == KEY_LEFT)
+          {
+            next_x = x;
+            next_y = y - 1;
+
+            dir = KEY_UP;
+          }
+          else if(key == KEY_RIGHT)
+          {
+            next_x = x;
+            next_y = y + 1;
+
+            dir = KEY_DOWN;
+          }
+          else if(key == KEY_UP)
+          {
+            next_x = x + 1;
+            next_y = y;
+
+            dir = KEY_RIGHT;
+          }
+          else if(key == KEY_DOWN)
+          {
+            next_x = x - 1;
+            next_y = y;
+
+            dir = KEY_LEFT;
+          }
+        }
+        else
+        {
+          return;
+        }
+
+        if(map[next_y][next_x] == 1)
+        {
+          if(key == KEY_LEFT)
+          {
+            next_x = x;
+            next_y = y + 1;
+
+            dir = KEY_DOWN;
+          }
+          else if(key == KEY_RIGHT)
+          {
+            next_x = x;
+            next_y = y - 1;
+
+            dir = KEY_UP;
+          }
+          else if(key == KEY_UP)
+          {
+            next_x = x - 1;
+            next_y = y;
+
+            dir = KEY_LEFT;
+          }
+          else if(key == KEY_DOWN)
+          {
+            next_x = x + 1;
+            next_y = y;
+
+            dir = KEY_RIGHT;
+          }
+        }
+        else
+        {
+          key = dir;
+          return;
+        }
+
+        if(map[next_y][next_x] == 1)
+        {
+          if(key == KEY_LEFT)
+            key = KEY_RIGHT;
+          else if(key == KEY_RIGHT)
+            key = KEY_LEFT;
+          else if(key == KEY_UP)
+            key = KEY_DOWN;
+          else if(key == KEY_DOWN)
+            key = KEY_UP;
+        }
+        else
+        {
+          key = dir;
+          return;
+        }
+      }
     }
     else if(x == GateManager[0].out.x && y == GateManager[0].out.y)
     {
+      if((GateManager[0].in.x == 0 || GateManager[0].in.x == WIDTH-1) || (GateManager[0].in.y == 0 || GateManager[0].in.y == HEIGHT-1))
+      {
       if(GateManager[0].in_dir == KEY_RIGHT)
       {
         x = 0;
@@ -671,6 +797,125 @@ void GateControl()
         y = GateManager[0].in.y;
 
         key = KEY_LEFT;
+      }
+      }
+      else
+      {
+        x = GateManager[0].in.x;
+        y = GateManager[0].in.y;
+
+        int next_x, next_y;
+        int dir;
+        if(key == KEY_LEFT)
+        {
+          next_x = x - 1;
+          next_y = y;
+        }
+        else if(key == KEY_RIGHT)
+        {
+          next_x = x + 1;
+          next_y = y;
+        }
+        else if(key == KEY_UP)
+        {
+          next_x = x;
+          next_y = y - 1;
+        }
+        else if(key == KEY_DOWN)
+        {
+          next_x = x;
+          next_y = y + 1;
+        }
+
+        if(map[next_y][next_x] == 1)
+        {
+          if(key == KEY_LEFT)
+          {
+            next_x = x;
+            next_y = y - 1;
+
+            dir = KEY_UP;
+          }
+          else if(key == KEY_RIGHT)
+          {
+            next_x = x;
+            next_y = y + 1;
+
+            dir = KEY_DOWN;
+          }
+          else if(key == KEY_UP)
+          {
+            next_x = x + 1;
+            next_y = y;
+
+            dir = KEY_RIGHT;
+          }
+          else if(key == KEY_DOWN)
+          {
+            next_x = x - 1;
+            next_y = y;
+
+            dir = KEY_LEFT;
+          }
+        }
+        else
+        {
+          return;
+        }
+
+        if(map[next_y][next_x] == 1)
+        {
+          if(key == KEY_LEFT)
+          {
+            next_x = x;
+            next_y = y + 1;
+
+            dir = KEY_DOWN;
+          }
+          else if(key == KEY_RIGHT)
+          {
+            next_x = x;
+            next_y = y - 1;
+
+            dir = KEY_UP;
+          }
+          else if(key == KEY_UP)
+          {
+            next_x = x - 1;
+            next_y = y;
+
+            dir = KEY_LEFT;
+          }
+          else if(key == KEY_DOWN)
+          {
+            next_x = x + 1;
+            next_y = y;
+
+            dir = KEY_RIGHT;
+          }
+        }
+        else
+        {
+          key = dir;
+          return;
+        }
+
+        if(map[next_y][next_x] == 1)
+        {
+          if(key == KEY_LEFT)
+            key = KEY_RIGHT;
+          else if(key == KEY_RIGHT)
+            key = KEY_LEFT;
+          else if(key == KEY_UP)
+            key = KEY_DOWN;
+          else if(key == KEY_DOWN)
+            key = KEY_UP;
+        }
+        else
+        {
+          key = dir;
+          return;
+        }
       }
     }
   }
