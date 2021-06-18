@@ -32,6 +32,7 @@ void GameClearview();             //미션을 모두 클리어 했을때 화면�
 void RunGame();                   //게임 실행을 위한 함수
 void MapLoad(int level);          // 스테이지별 맵 로드
 bool GateCheck();
+void GateControl();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
 WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
@@ -133,7 +134,9 @@ class Gate {
 public:
   Timer spawnTime;
   POSITION in;
+  int in_dir;
   POSITION out;
+  int out_dir;
 
   Gate() {
     setGatePos();
@@ -156,6 +159,24 @@ public:
       out.x = (rand() % (WIDTH-1)) + 1;
       out.y = (rand() % (HEIGHT-1)) + 1;
     }
+
+    if(in.x == 0)
+      in_dir = KEY_RIGHT;
+    else if(in.x == WIDTH-1)
+      in_dir = KEY_LEFT;
+    else if(in.y == 0)
+      in_dir = KEY_DOWN;
+    else
+      in_dir = KEY_UP;
+
+    if(out.x == 0)
+      out_dir = KEY_RIGHT;
+    else if(out.x == WIDTH-1)
+      out_dir = KEY_LEFT;
+    else if(out.y == 0)
+      out_dir = KEY_DOWN;
+    else
+      out_dir = KEY_UP;
   }
 };
 
@@ -542,13 +563,15 @@ void update()
     {
       GateManager[i].spawnTime.updateTime();
 
-      if(GateManager[i].spawnTime.getTick() >= 5 && !GateCheck()) {
+      if(GateManager[i].spawnTime.getTick() >= 10 && !GateCheck()) {
         map[GateManager[i].in.y][GateManager[i].in.x] = map[GateManager[i].out.y][GateManager[i].out.x] = 1;
         GateManager.pop_back();
 
         IsGate = !IsGate;
       }
     }
+
+    GateControl();
 
     // 지도 업데이트 함수 호출
     map_update(false);
@@ -582,6 +605,75 @@ bool GateCheck()
     }
   }
   return false;
+}
+
+void GateControl()
+{
+  if(GateCheck())
+  {
+    if(x == GateManager[0].in.x && y == GateManager[0].in.y)
+    {
+      if(GateManager[0].out_dir == KEY_RIGHT)
+      {
+        x = 0;
+        y = GateManager[0].out.y;
+
+        key = KEY_RIGHT;
+      }
+      else if(GateManager[0].out_dir == KEY_UP)
+      {
+        x = GateManager[0].out.x;
+        y = HEIGHT-1;
+
+        key = KEY_UP;
+      }
+      else if(GateManager[0].out_dir == KEY_DOWN)
+      {
+        x = GateManager[0].out.x;
+        y = 0;
+
+        key = KEY_RIGHT;
+      }
+      else if(GateManager[0].out_dir == KEY_LEFT)
+      {
+        x = WIDTH-1;
+        y = GateManager[0].out.y;
+
+        key = KEY_LEFT;
+      }
+    }
+    else if(x == GateManager[0].out.x && y == GateManager[0].out.y)
+    {
+      if(GateManager[0].in_dir == KEY_RIGHT)
+      {
+        x = 0;
+        y = GateManager[0].in.y;
+
+        key = KEY_RIGHT;
+      }
+      else if(GateManager[0].in_dir == KEY_UP)
+      {
+        x = GateManager[0].in.x;
+        y = HEIGHT-1;
+
+        key = KEY_UP;
+      }
+      else if(GateManager[0].in_dir == KEY_DOWN)
+      {
+        x = GateManager[0].in.x;
+        y = 0;
+
+        key = KEY_RIGHT;
+      }
+      else if(GateManager[0].in_dir == KEY_LEFT)
+      {
+        x = WIDTH-1;
+        y = GateManager[0].in.y;
+
+        key = KEY_LEFT;
+      }
+    }
+  }
 }
 
 // 비동기 키 입력 처리를 위한 함수
