@@ -31,7 +31,7 @@ void nextlevelview();             //미션 완료시 화면을 위한 함수
 void GameClearview();             //미션을 모두 클리어 했을때 화면을 위한 함수
 void RunGame();                   //게임 실행을 위한 함수
 void MapLoad(int level);          // 스테이지별 맵 로드
-void Gate();
+void GateControl();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
 WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
@@ -64,8 +64,6 @@ bool IsMissionClear = false;
 
 //
 bool IsGate = false;
-int gate_in[2][2] = { {0, 0}, {0, 0} };
-int gate_out[2][2]  = { {0, 0}, {0, 0} };
 
 // 포지션
 struct POSITION {
@@ -131,6 +129,38 @@ public:
   }
 };
 
+class Gate {
+public:
+  Timer spawnTime;
+  POSITION in;
+  POSITION out;
+
+  Gate() {
+    setGatePos();
+
+    this->spawnTime.startTimer();
+  }
+
+  void setGatePos() {
+    in.x = (rand() % (WIDTH-1)) + 1;
+    in.y = (rand() % (HEIGHT-1)) + 1;
+
+    while(map[in.y][in.x] != 1)
+    {
+      in.x = (rand() % (WIDTH-1)) + 1;
+      in.y = (rand() % (HEIGHT-1)) + 1;
+    }
+
+    while(map[out.y][out.x] != 1 || (in == out))
+    {
+      out.x = (rand() % (WIDTH-1)) + 1;
+      out.y = (rand() % (HEIGHT-1)) + 1;
+    }
+  }
+};
+
+vector<Gate> GateManager;
+
 //실행함수
 void RunGame()
 {
@@ -138,10 +168,6 @@ void RunGame()
   int count = 0;
   while(count <= 2)
   {
-    gate_in[0][0] = gate_in[0][1] = gate_in[1][0] = gate_in[1][1] = 0;
-    gate_out[0][0] = gate_out[0][1] = gate_out[1][0] = gate_out[1][1] = 0;
-    Gate();
-
     update();
     if(IsMissionClear)
     {
@@ -504,7 +530,26 @@ void update()
     for(int i = 0; i < body.size(); i++)
       map[body[i].first][body[i].second] = 4;
 
-    Gate();
+
+    if(IsGate == false)
+    {
+      GateManager.push_back(Gate());
+      IsGate = !IsGate;
+    }
+
+    // 게이트 유효 시간 제어
+    for(int i = 0; i < GateManager.size(); i++)
+    {
+      GateManager[i].spawnTime.updateTime();
+
+      if(GateManager[i].spawnTime.getTick() >= 5) {
+        map[GateManager[i].in.y][GateManager[i].in.x] = map[GateManager[i].out.y][GateManager[i].out.x] = 1;
+        GateManager.pop_back();
+
+        IsGate = !IsGate;
+      }
+    }
+
     // 지도 업데이트 함수 호출
     map_update(false);
 
@@ -559,6 +604,9 @@ void map_update(bool itemIs)
     else
       map[ItemContainer[items].pos.x][ItemContainer[items].pos.y] = 6;
   }
+
+  for(int gates = 0; gates < GateManager.size(); gates++)
+    map[GateManager[gates].in.y][GateManager[gates].in.x] = map[GateManager[gates].out.y][GateManager[gates].out.x] = 7;
 
   for(int i = 0; i < HEIGHT; i++)
   {
@@ -671,36 +719,6 @@ void init_reset()
   // Head 기준으로 오른쪽으로 Body 초기 설정
   body.push_back(pair<int, int>(y, x+1));
   body.push_back(pair<int, int>(y, x+2));
-}
-
-void Gate()
-{
-  if(!IsGate)
-  {
-    gate_in[0][0] = gate_in[1][0];
-    gate_in[0][1] = gate_in[1][1];
-    gate_out[0][0] = gate_out[1][0];
-    gate_out[0][1] = gate_out[1][1];
-
-    while(map[gate_in[1][0]][gate_in[1][1]] != 1)
-    {
-      gate_in[1][0] = (rand() % (HEIGHT-1)) + 1;
-      gate_in[1][1] = (rand() % (WIDTH-1)) + 1;
-    }
-
-    while(map[gate_out[1][0]][gate_out[1][1]] != 1 || (gate_in[1][0] == gate_out[1][0] && gate_in[1][1] == gate_out[1][1]))
-    {
-      gate_out[1][0] = (rand() % (HEIGHT-1)) + 1;
-      gate_out[1][1] = (rand() % (WIDTH-1)) + 1;
-    }
-
-    map[gate_in[0][0]][gate_in[0][1]] = 1;
-    map[gate_out[0][0]][gate_out[0][1]] = 1;
-
-    map[gate_in[1][0]][gate_in[1][1]] = map[gate_out[1][0]][gate_out[1][1]] = 7;
-
-    IsGate = true;
-  }
 }
 
 // 종료 전 메모리 반환을 위한 함수
