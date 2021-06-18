@@ -7,6 +7,7 @@
 #include <math.h>
 #include <fstream>
 #include <string>
+#include <cstdlib>
 
 #include "timer.h"
 using namespace std;
@@ -33,6 +34,7 @@ void RunGame();                   //게임 실행을 위한 함수
 void MapLoad(int level);          // 스테이지별 맵 로드
 bool GateCheck();
 void GateControl();
+void Score();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
 WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
@@ -52,8 +54,8 @@ int y = HEIGHT/2, x = WIDTH/2;
 // Head를 따라갈 body (벡터의 원소는 (y, x)를 저장하도록 pair 자료형 사용)
 vector<pair<int, int>> body;
 
-//미션에 대한 2차원 벡터 missionvec[i][j]라 할 때 i는 레벨,  j는 순서대로 각 레벨의 목표bodylength, 목표growth_cnt, 목표poison_cnt 이다.
-vector<vector<int> > missionvec = { {3, 1, 0}, {3, 1, 1}, {3, 2, 1} };
+//미션에 대한 2차원 벡터 missionvec[i][j]라 할 때 i는 레벨,  j는 순서대로 각 레벨의 목표bodylength, 목표growth_cnt, 목표poison_cnt, 목표gate_score 이다.
+vector<vector<int> > missionvec = { {3, 1, 0, 0}, {4, 1, 1, 1}, {6, 2, 1, 2}, {10, 4, 2, 3} };
 
 // 입력키 저장을 위한 변수 (NCurses에 내장된 키워드 사용)
 static int key = KEY_LEFT;
@@ -187,12 +189,12 @@ void RunGame()
 {
   //count는 레벨의 갯수만큼 반복 레벨을 모두 클리어 하거나, 게임오버가 되면 게임이 종료된다.
   int count = 0;
-  while(count <= 2)
+  while(count <= 3)
   {
     update();
     if(IsMissionClear)
     {
-      if(level == 3)
+      if(level == 4)
       {
         GameClearview();
         break;
@@ -360,8 +362,31 @@ void MapLoad(int level)
 }
 
 vector<Item> ItemContainer(0);
+int top_record = 0;
 int growth_cnt = 0;
 int poison_cnt = 0;
+int gate_score = 0;
+
+void Score()
+{
+  ifstream load("data/score.txt");
+
+  string record;
+  getline(load, record);
+
+  top_record = stoi(record);
+
+  if(body.size()+1 > top_record)
+  {
+    ofstream save("data/score.txt");
+
+    top_record = body.size()+1;
+    save.write(to_string(body.size()+1).c_str(), to_string(body.size()+1).size());
+
+    save.close();
+  }
+  load.close();
+}
 
 /* init() 함수에 내장된 코드였으나 비동기 입력 처리 함수(keyControl) 사용시
    그래픽이 깨지는 문제가 발생해 매번 업데이트 직전에 모든 Window들을 종료했다가 재시작 처리 */
@@ -394,10 +419,10 @@ void init_draw(int playtime)
   // 점수창 초기 텍스트 설정
   wattron(win2, COLOR_PAIR(4));
   mvwprintw(win2, 1, 1, "Score Board");
-  mvwprintw(win2, 3, 1, "B: %d / 0", body.size()+1);
+  mvwprintw(win2, 3, 1, "B: %d / %d", body.size()+1, top_record);
   mvwprintw(win2, 4, 1, "+: %d", growth_cnt);
   mvwprintw(win2, 5, 1, "-: %d", poison_cnt);
-  mvwprintw(win2, 6, 1, "G: 0");
+  mvwprintw(win2, 6, 1, "G: %d", gate_score);
   mvwprintw(win2, 8, 1, "PlayTime : %d", playtime);
   wattroff(win2, COLOR_PAIR(4));
 
@@ -409,14 +434,14 @@ void init_draw(int playtime)
   // 미션창 초기 텍스트 설정 현재 목표 미션과 현재 생태를 확인할 수 있다.
   wattron(win3, COLOR_PAIR(4));
   mvwprintw(win3, 1, 1, "Mission");
-  mvwprintw(win3, 3, 1, "B: %d (%d)",missionvec[level][0],body.size()+1);
-  mvwprintw(win3, 4, 1, "+: %d (%d)",missionvec[level][1] , growth_cnt);
-  mvwprintw(win3, 5, 1, "-: %d (%d)",missionvec[level][2] , poison_cnt);
-  mvwprintw(win3, 6, 1, "G: ()");
+  mvwprintw(win3, 3, 1, "B: %d", missionvec[level][0]);
+  mvwprintw(win3, 4, 1, "+: %d", missionvec[level][1]);
+  mvwprintw(win3, 5, 1, "-: %d", missionvec[level][2]);
+  mvwprintw(win3, 6, 1, "G: %d", missionvec[level][3]);
   wattroff(win3, COLOR_PAIR(4));
 
   // 미션을 충족했으면 미션 클리어 변수에 true; 하고 레벨을 하나 올린다.
-  if(missionvec[level][0] <= body.size()+1 && missionvec[level][1] <= growth_cnt && missionvec[level][2] <= poison_cnt)
+  if(missionvec[level][0] <= body.size()+1 && missionvec[level][1] <= growth_cnt && missionvec[level][2] <= poison_cnt && missionvec[level][3] <= gate_score)
   {
       IsMissionClear = true;
       level++;
@@ -445,9 +470,13 @@ void update()
   double itemtime;
   init_draw(playtime);
 
+
   int addY, addX;
   while(running)
   {
+    // 최대 점수 불러오기
+    Score();
+    
     init_draw(playtime);
     if(IsMissionClear)
     {
@@ -555,6 +584,7 @@ void update()
       map[body[i].first][body[i].second] = 4;
 
 
+    // 게이트가 존재하지 않으면 생성
     if(IsGate == false)
     {
       GateManager.push_back(Gate());
@@ -566,6 +596,7 @@ void update()
     {
       GateManager[i].spawnTime.updateTime();
 
+      // 생성된지 10초가 지났고 Snake가 지나지 않을 때 삭제
       if(GateManager[i].spawnTime.getTick() >= 10 && !GateCheck()) {
         map[GateManager[i].in.y][GateManager[i].in.x] = map[GateManager[i].out.y][GateManager[i].out.x] = 1;
         GateManager.pop_back();
@@ -574,6 +605,7 @@ void update()
       }
     }
 
+    // 게이트 이동 처리
     GateControl();
 
     // 지도 업데이트 함수 호출
@@ -593,6 +625,7 @@ void update()
     key_thread.join();
 }
 
+// 현재 Head나 Body가 게이트를 지나고 있는지 체크하는 함수
 bool GateCheck()
 {
   if((GateManager[0].in.y == y && GateManager[0].in.x == x) || (GateManager[0].out.y == y && GateManager[0].out.x == x))
@@ -610,42 +643,45 @@ bool GateCheck()
   return false;
 }
 
+// Head가 게이트에 진입했을 때, 반대쪽 게이트로 이동시키는 함수 (비교문이 너무 많아서 개선 예정)
 void GateControl()
 {
   if(GateCheck())
   {
     if(x == GateManager[0].in.x && y == GateManager[0].in.y)
     {
+      gate_score++;
+
       if((GateManager[0].out.x == 0 || GateManager[0].out.x == WIDTH-1) || (GateManager[0].out.y == 0 || GateManager[0].out.y == HEIGHT-1))
       {
-      if(GateManager[0].out_dir == KEY_RIGHT)
-      {
-        x = 0;
-        y = GateManager[0].out.y;
+        if(GateManager[0].out_dir == KEY_RIGHT)
+        {
+          x = 0;
+          y = GateManager[0].out.y;
 
-        key = KEY_RIGHT;
-      }
-      else if(GateManager[0].out_dir == KEY_UP)
-      {
-        x = GateManager[0].out.x;
-        y = HEIGHT-1;
+          key = KEY_RIGHT;
+        }
+        else if(GateManager[0].out_dir == KEY_UP)
+        {
+          x = GateManager[0].out.x;
+          y = HEIGHT-1;
 
-        key = KEY_UP;
-      }
-      else if(GateManager[0].out_dir == KEY_DOWN)
-      {
-        x = GateManager[0].out.x;
-        y = 0;
+          key = KEY_UP;
+        }
+        else if(GateManager[0].out_dir == KEY_DOWN)
+        {
+          x = GateManager[0].out.x;
+          y = 0;
 
-        key = KEY_RIGHT;
-      }
-      else if(GateManager[0].out_dir == KEY_LEFT)
-      {
-        x = WIDTH-1;
-        y = GateManager[0].out.y;
+          key = KEY_RIGHT;
+        }
+        else if(GateManager[0].out_dir == KEY_LEFT)
+        {
+          x = WIDTH-1;
+          y = GateManager[0].out.y;
 
-        key = KEY_LEFT;
-      }
+          key = KEY_LEFT;
+        }
       }
       else
       {
@@ -768,36 +804,38 @@ void GateControl()
     }
     else if(x == GateManager[0].out.x && y == GateManager[0].out.y)
     {
+      gate_score++;
+
       if((GateManager[0].in.x == 0 || GateManager[0].in.x == WIDTH-1) || (GateManager[0].in.y == 0 || GateManager[0].in.y == HEIGHT-1))
       {
-      if(GateManager[0].in_dir == KEY_RIGHT)
-      {
-        x = 0;
-        y = GateManager[0].in.y;
+        if(GateManager[0].in_dir == KEY_RIGHT)
+        {
+          x = 0;
+          y = GateManager[0].in.y;
 
-        key = KEY_RIGHT;
-      }
-      else if(GateManager[0].in_dir == KEY_UP)
-      {
-        x = GateManager[0].in.x;
-        y = HEIGHT-1;
+          key = KEY_RIGHT;
+        }
+        else if(GateManager[0].in_dir == KEY_UP)
+        {
+          x = GateManager[0].in.x;
+          y = HEIGHT-1;
 
-        key = KEY_UP;
-      }
-      else if(GateManager[0].in_dir == KEY_DOWN)
-      {
-        x = GateManager[0].in.x;
-        y = 0;
+          key = KEY_UP;
+        }
+        else if(GateManager[0].in_dir == KEY_DOWN)
+        {
+          x = GateManager[0].in.x;
+          y = 0;
 
-        key = KEY_RIGHT;
-      }
-      else if(GateManager[0].in_dir == KEY_LEFT)
-      {
-        x = WIDTH-1;
-        y = GateManager[0].in.y;
+          key = KEY_RIGHT;
+        }
+        else if(GateManager[0].in_dir == KEY_LEFT)
+        {
+          x = WIDTH-1;
+          y = GateManager[0].in.y;
 
-        key = KEY_LEFT;
-      }
+          key = KEY_LEFT;
+        }
       }
       else
       {
