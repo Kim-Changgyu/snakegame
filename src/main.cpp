@@ -31,7 +31,7 @@ void nextlevelview();             //미션 완료시 화면을 위한 함수
 void GameClearview();             //미션을 모두 클리어 했을때 화면을 위한 함수
 void RunGame();                   //게임 실행을 위한 함수
 void MapLoad(int level);          // 스테이지별 맵 로드
-void GateControl();
+bool GateCheck();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
 WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
@@ -542,7 +542,7 @@ void update()
     {
       GateManager[i].spawnTime.updateTime();
 
-      if(GateManager[i].spawnTime.getTick() >= 5) {
+      if(GateManager[i].spawnTime.getTick() >= 5 && !GateCheck()) {
         map[GateManager[i].in.y][GateManager[i].in.x] = map[GateManager[i].out.y][GateManager[i].out.x] = 1;
         GateManager.pop_back();
 
@@ -565,6 +565,23 @@ void update()
   // 입력 제어 쓰레드 종료를 먼저 기다린 뒤 함수 종료
   if(key_thread.joinable())
     key_thread.join();
+}
+
+bool GateCheck()
+{
+  if((GateManager[0].in.y == y && GateManager[0].in.x == x) || (GateManager[0].out.y == y && GateManager[0].out.x == x))
+  {
+    return true;
+  }
+  else
+  {
+    for(int i = 0; i < body.size(); i++)
+    {
+      if((GateManager[0].in.y == body[i].first && GateManager[0].in.x == body[i].second) || (GateManager[0].out.y == body[i].first && GateManager[0].out.x == body[i].second))
+        return true;
+    }
+  }
+  return false;
 }
 
 // 비동기 키 입력 처리를 위한 함수
