@@ -30,7 +30,8 @@ void gameoverview();              //게임 오버시 화면을 위한 함수
 void nextlevelview();             //미션 완료시 화면을 위한 함수
 void GameClearview();             //미션을 모두 클리어 했을때 화면을 위한 함수
 void RunGame();                   //게임 실행을 위한 함수
-void MapLoad(int level);
+void MapLoad(int level);          // 스테이지별 맵 로드
+void Gate();
 
 // 스네이크 게임에 사용할 Window들을 전역 변수로 선언
 WINDOW *win1;         // 게임화면(Wall, Head, Body 등이 움직이는 Field)
@@ -61,6 +62,11 @@ bool running = true;
 // 미션을 클리어했는지 에 대한 변수
 bool IsMissionClear = false;
 
+//
+bool IsGate = false;
+int gate_in[2][2] = { {0, 0}, {0, 0} };
+int gate_out[2][2]  = { {0, 0}, {0, 0} };
+
 // 포지션
 struct POSITION {
     int x, y;
@@ -86,10 +92,10 @@ public:
     int itemtype;
 
     Item() {
-      if(rand() % 2 == 0)
-        this->itemtype = 5;
-      else
+      if(rand() % 3 == 0)
         this->itemtype = 6;
+      else
+        this->itemtype = 5;
 
       setItemPos();
       this->spawnTime.startTimer();
@@ -132,6 +138,10 @@ void RunGame()
   int count = 0;
   while(count <= 2)
   {
+    gate_in[0][0] = gate_in[0][1] = gate_in[1][0] = gate_in[1][1] = 0;
+    gate_out[0][0] = gate_out[0][1] = gate_out[1][0] = gate_out[1][1] = 0;
+    Gate();
+
     update();
     if(IsMissionClear)
     {
@@ -142,6 +152,7 @@ void RunGame()
       }
       nextlevelview();
       IsMissionClear = false;
+      IsGate = false;
     }
     else
     {
@@ -445,7 +456,7 @@ void update()
       y--;
     else if(key == KEY_DOWN)
       y++;
-    if(y < 1 || y > HEIGHT-2 || x < 1 || x > WIDTH-2 || map[y][x] == 1) // 지도를 벗어나거나 ESC를 입력하면 종료
+    if(map[y][x] == 1) // 지도를 벗어나거나 ESC를 입력하면 종료
     {
       running = false;
       break;
@@ -493,6 +504,7 @@ void update()
     for(int i = 0; i < body.size(); i++)
       map[body[i].first][body[i].second] = 4;
 
+    Gate();
     // 지도 업데이트 함수 호출
     map_update(false);
 
@@ -594,10 +606,16 @@ void map_update(bool itemIs)
         mvwprintw(win1, i, j*2, "%d%d", map[i][j], map[i][j]);
         wattroff(win1, COLOR_PAIR(8));
       }
+      else
+      {
+        wattron(win1, COLOR_PAIR(8));
+        mvwprintw(win1, i, j*2, "%d%d", map[i][j], map[i][j]);
+        wattroff(win1, COLOR_PAIR(8));
+      }
     }
   }
-
 }
+
 //게임화면 리셋을 위한 함수
 void init_reset()
 {
@@ -655,6 +673,35 @@ void init_reset()
   body.push_back(pair<int, int>(y, x+2));
 }
 
+void Gate()
+{
+  if(!IsGate)
+  {
+    gate_in[0][0] = gate_in[1][0];
+    gate_in[0][1] = gate_in[1][1];
+    gate_out[0][0] = gate_out[1][0];
+    gate_out[0][1] = gate_out[1][1];
+
+    while(map[gate_in[1][0]][gate_in[1][1]] != 1)
+    {
+      gate_in[1][0] = (rand() % (HEIGHT-1)) + 1;
+      gate_in[1][1] = (rand() % (WIDTH-1)) + 1;
+    }
+
+    while(map[gate_out[1][0]][gate_out[1][1]] != 1 || (gate_in[1][0] == gate_out[1][0] && gate_in[1][1] == gate_out[1][1]))
+    {
+      gate_out[1][0] = (rand() % (HEIGHT-1)) + 1;
+      gate_out[1][1] = (rand() % (WIDTH-1)) + 1;
+    }
+
+    map[gate_in[0][0]][gate_in[0][1]] = 1;
+    map[gate_out[0][0]][gate_out[0][1]] = 1;
+
+    map[gate_in[1][0]][gate_in[1][1]] = map[gate_out[1][0]][gate_out[1][1]] = 7;
+
+    IsGate = true;
+  }
+}
 
 // 종료 전 메모리 반환을 위한 함수
 void exit()
